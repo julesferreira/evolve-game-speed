@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         evolve-game-speed
 // @namespace    https://github.com/julesferreira/evolve-game-speed
-// @version      1.0
+// @version      1.1
 // @description  override the default game speed
 // @author       jules
 // @license      MIT

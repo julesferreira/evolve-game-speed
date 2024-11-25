@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         evolve-game-speed
 // @namespace    https://github.com/julesferreira/evolve-game-speed
-// @version      1.0
+// @version      1.1
 // @description  override the default game speed
 // @author       jules
 // @license      MIT
@@ -31,64 +31,79 @@ simplified version of Wushigejiajia's script: https://greasyfork.org/en/scripts/
     window.localStorage.setItem(key, JSON.stringify(value));
   };
 
-  let customSpeed = getValue("customSpeed", 1);
-  let fromScript = false;
-  let vueMethod;
+  const initialSpeed = getValue("customSpeed", 1);
 
-  const oldPost = Worker.prototype.postMessage;
-  Worker.prototype.postMessage = async function (...args) {
-    let that = this;
-    async function hookPost() {
-      if (args[0].period) {
-        args[0].period = args[0].period / customSpeed;
-      }
-      oldPost.apply(that, args);
-    }
-    let hookResult = await hookPost();
-    if (fromScript) {
-      vueMethod.pause();
-      fromScript = false;
-    }
-    return hookResult;
-  };
+  const script = document.createElement("script");
+  script.textContent = `
+        (() => {
+            let customSpeed = ${initialSpeed};
+            let fromScript = false;
+            let vueMethod;
 
-  const hijackWorker = () => {
-    if (vueMethod && !vueMethod._data.s.pause) {
-      fromScript = true;
-      vueMethod.pause();
-    }
-  };
+            const oldPost = Worker.prototype.postMessage;
 
-  const updateSpeedDisplay = (speedSpan) => {
-    speedSpan.textContent = `speed ×${customSpeed}`;
-  };
+            Worker.prototype.postMessage = async function(...args) {
+                let that = this;
+                async function hookPost() {
+                    if (args[0].period) {
+                        args[0].period = args[0].period / customSpeed;
+                    }
+                    oldPost.apply(that, args);
+                }
+                let hookResult = await hookPost();
+                if (fromScript) {
+                    vueMethod.pause();
+                    fromScript = false;
+                }
+                return hookResult;
+            };
 
-  let timer = setInterval(() => {
-    const versionLog = document.getElementById("versionLog");
-    if (!versionLog) {
-      return;
-    }
+            const hijackWorker = () => {
+                if (vueMethod && !vueMethod._data.s.pause) {
+                    fromScript = true;
+                    vueMethod.pause();
+                }
+            };
 
-    clearInterval(timer);
+            const updateSpeedDisplay = (speedSpan) => {
+                speedSpan.textContent = \`speed ×\${customSpeed}\`;
+            };
 
-    const speedSpan = document.createElement("span");
-    speedSpan.id = "customSpeed";
-    speedSpan.className = "version";
-    speedSpan.style.cursor = "pointer";
-    updateSpeedDisplay(speedSpan);
+            let timer = setInterval(() => {
+                const versionLog = document.getElementById("versionLog");
+                if (!versionLog) {
+                    return;
+                }
+                clearInterval(timer);
 
-    speedSpan.addEventListener("click", () => {
-      customSpeed = Math.max(
-        Number(prompt("multiply default game speed by:", customSpeed)) || 1,
-        1,
-      );
-      setValue("customSpeed", customSpeed);
-      updateSpeedDisplay(speedSpan);
-      hijackWorker();
-    });
+                const speedSpan = document.createElement("span");
+                speedSpan.id = "customSpeed";
+                speedSpan.className = "version";
+                speedSpan.style.cursor = "pointer";
+                updateSpeedDisplay(speedSpan);
 
-    versionLog.parentNode.insertBefore(speedSpan, versionLog);
-    vueMethod = document.querySelector("#topBar").__vue__;
-    hijackWorker();
-  }, 100);
+                speedSpan.addEventListener("click", () => {
+                    const newSpeed = Math.max(
+                        Number(prompt("multiply default game speed by:", customSpeed)) || 1,
+                        1
+                    );
+                    customSpeed = newSpeed;
+                    document.dispatchEvent(new CustomEvent('speedChanged', { detail: newSpeed }));
+                    updateSpeedDisplay(speedSpan);
+                    hijackWorker();
+                });
+
+                versionLog.parentNode.insertBefore(speedSpan, versionLog);
+                vueMethod = document.querySelector("#topBar").__vue__;
+                hijackWorker();
+            }, 100);
+        })();
+    `;
+
+  document.documentElement.appendChild(script);
+  script.remove();
+
+  document.addEventListener("speedChanged", (event) => {
+    setValue("customSpeed", event.detail);
+  });
 })();
