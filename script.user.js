@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         evolve-game-speed
 // @namespace    https://github.com/julesferreira/evolve-game-speed
-// @version      1.1
+// @version      1.2
 // @description  override the default game speed
 // @author       jules
 // @license      MIT
@@ -42,20 +42,21 @@ simplified version of Wushigejiajia's script: https://greasyfork.org/en/scripts/
 
             const oldPost = Worker.prototype.postMessage;
 
-            Worker.prototype.postMessage = async function(...args) {
-                let that = this;
-                async function hookPost() {
-                    if (args[0].period) {
-                        args[0].period = args[0].period / customSpeed;
-                    }
-                    oldPost.apply(that, args);
+            Worker.prototype.postMessage = function(...args) {
+                if (args[0].period) {
+                    args[0].period = args[0].period / customSpeed;
                 }
-                let hookResult = await hookPost();
+
+                oldPost.apply(this, args);
+
                 if (fromScript) {
-                    vueMethod.pause();
+                    setTimeout(() => {
+                        if (vueMethod) {
+                            vueMethod.pause();
+                        }
+                    }, 0);
                     fromScript = false;
                 }
-                return hookResult;
             };
 
             const hijackWorker = () => {
